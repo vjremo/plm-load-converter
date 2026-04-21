@@ -393,6 +393,9 @@
   }
 
   function convert(workbook) {
+    if (workbook.SheetNames.length < 2) {
+      throw new Error("Workbook must contain at least two sheets: Sheet1 (data) and Sheet2 (references).");
+    }
     const wsData = workbook.Sheets[workbook.SheetNames[0]];
     const wsRef  = workbook.Sheets[workbook.SheetNames[1]];
     const lookup = buildLookup(wsRef);

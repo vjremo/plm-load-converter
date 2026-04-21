@@ -1,5 +1,9 @@
+import os
+import tempfile
+
 import pytest
-from convert import build_lookup, parse_header, transform_cell
+from openpyxl import Workbook
+from convert import build_lookup, convert, parse_header, transform_cell
 
 # Minimal lookup table used across all list-based tests
 LOOKUP = {
@@ -165,3 +169,118 @@ class TestPlain:
 
     def test_numeric_value_as_string(self):
         assert transform_cell(42, None, None, LOOKUP, 1, "col") == "42"
+
+
+# ── build_lookup ──────────────────────────────────────────────────────────────
+
+class TestBuildLookup:
+    def _make_ref_sheet(self, data):
+        wb = Workbook()
+        ws = wb.active
+        for row in data:
+            ws.append(row)
+        return ws
+
+    def test_builds_lookup_from_headers(self):
+        ws = self._make_ref_sheet([
+            ["Department-Internal Name", "Department-Display Name"],
+            ["xyzDept1", "Dept 1"],
+            ["xyzDept2", "Dept 2"],
+        ])
+        result = build_lookup(ws)
+        assert result == {"Department": {"Dept 1": "xyzDept1", "Dept 2": "xyzDept2"}}
+
+    def test_multiple_categories(self):
+        ws = self._make_ref_sheet([
+            ["Dept-Internal Name", "Dept-Display Name", "Class-Internal Name", "Class-Display Name"],
+            ["d1", "Display D1", "c1", "Display C1"],
+        ])
+        result = build_lookup(ws)
+        assert result["Dept"] == {"Display D1": "d1"}
+        assert result["Class"] == {"Display C1": "c1"}
+
+    def test_skips_none_rows(self):
+        ws = self._make_ref_sheet([
+            ["X-Internal Name", "X-Display Name"],
+            ["val1", "disp1"],
+            [None, None],
+        ])
+        result = build_lookup(ws)
+        assert result == {"X": {"disp1": "val1"}}
+
+    def test_empty_references_sheet(self):
+        ws = self._make_ref_sheet([["No-Match-Header"]])
+        assert build_lookup(ws) == {}
+
+
+# ── convert() integration ─────────────────────────────────────────────────────
+
+def _make_workbook(data_rows, ref_rows):
+    wb = Workbook()
+    ws1 = wb.active
+    ws1.title = "Sheet1"
+    for row in data_rows:
+        ws1.append(row)
+    ws2 = wb.create_sheet("Sheet2")
+    for row in ref_rows:
+        ws2.append(row)
+    return wb
+
+
+class TestConvert:
+    def _run(self, data_rows, ref_rows):
+        wb = _make_workbook(data_rows, ref_rows)
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f:
+            in_path = f.name
+        out_path = in_path.replace(".xlsx", ".txt")
+        try:
+            wb.save(in_path)
+            convert(in_path, out_path)
+            with open(out_path, encoding="utf-8") as f:
+                return f.read()
+        finally:
+            os.unlink(in_path)
+            if os.path.exists(out_path):
+                os.unlink(out_path)
+
+    def test_plain_columns(self):
+        result = self._run(
+            [["Name", "Code"], ["Widget", "W001"]],
+            [["X-Internal Name", "X-Display Name"]],
+        )
+        assert result == "Widget\tW001"
+
+    def test_single_list_column(self):
+        result = self._run(
+            [["Dept-SingleList"], ["Dept 1"]],
+            [["Dept-Internal Name", "Dept-Display Name"], ["xyzDept1", "Dept 1"]],
+        )
+        assert result == "xyzDept1"
+
+    def test_multiple_data_rows(self):
+        result = self._run(
+            [["Name", "Active-Boolean"], ["A", "Yes"], ["B", "No"]],
+            [["X-Internal Name", "X-Display Name"]],
+        )
+        assert result == "A\ttrue\nB\tfalse"
+
+    def test_missing_sheet2_raises(self):
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["Name"])
+        ws.append(["A"])
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f:
+            in_path = f.name
+        out_path = in_path.replace(".xlsx", ".txt")
+        try:
+            wb.save(in_path)
+            with pytest.raises(ValueError, match="at least two sheets"):
+                convert(in_path, out_path)
+        finally:
+            os.unlink(in_path)
+            if os.path.exists(out_path):
+                os.unlink(out_path)
+
+    def test_empty_sheet1_raises(self):
+        with pytest.raises(ValueError, match="Sheet1 is empty"):
+            self._run([], [["X-Internal Name", "X-Display Name"]])

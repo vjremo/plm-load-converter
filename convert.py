@@ -16,6 +16,7 @@ Column header suffix rules:
   (none)        output as-is
 """
 
+import re
 import sys
 from openpyxl import load_workbook
 
@@ -129,7 +130,6 @@ def transform_cell(raw, suffix, category, lookup, row_num, col_name):
         )
 
     if suffix == "Integer":
-        import re
         if not re.fullmatch(r"[+-]?\d+", value):
             raise ValueError(
                 f"Row {row_num}, column '{col_name}': "
@@ -146,6 +146,10 @@ def transform_cell(raw, suffix, category, lookup, row_num, col_name):
 
 def convert(input_path: str, output_path: str):
     wb = load_workbook(input_path, data_only=True)
+    if len(wb.worksheets) < 2:
+        raise ValueError(
+            "Workbook must contain at least two sheets: Sheet1 (data) and Sheet2 (references)"
+        )
     ws_data = wb.worksheets[0]   # Sheet1
     ws_ref = wb.worksheets[1]    # Sheet2 / References
 
