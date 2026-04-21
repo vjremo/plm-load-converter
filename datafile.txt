@@ -1,0 +1,2 @@
+Product	Product\Type1	Test Product	xyzDept1	xyzClass1	xyz6plus	Test Descrition	3.05	true
+Product	Product\Type1	Test Product	xyzDept1	xyzClass2	xyz0to3|~*~|xyz6plus	Test Description	3.05	true

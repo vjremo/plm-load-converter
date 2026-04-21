@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Excel → Tab / CSV Converter</title>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f4f6f9;
+      color: #1a1a2e;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.09);
+      width: 100%;
+      max-width: 860px;
+      padding: 36px 40px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      gap: 16px;
+    }
+
+    .card-header-text h1 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 4px;
+    }
+    .card-header-text .subtitle {
+      font-size: 0.875rem;
+      color: #6b7280;
+    }
+
+    .btn-reset {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #fff;
+      color: #6b7280;
+      border: 1px solid #e5e7eb;
+      border-radius: 7px;
+      padding: 8px 16px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .btn-reset:hover {
+      background: #fef2f2;
+      color: #dc2626;
+      border-color: #fca5a5;
+    }
+    .btn-reset:disabled {
+      opacity: 0.4;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    .drop-zone {
+      border: 2px dashed #c7d2fe;
+      border-radius: 10px;
+      background: #f8f9ff;
+      padding: 36px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: #6366f1;
+      background: #eef2ff;
+    }
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+    .drop-icon { font-size: 2rem; margin-bottom: 8px; }
+    .drop-label { font-size: 0.95rem; color: #4b5563; }
+    .drop-label span { color: #6366f1; font-weight: 600; }
+    .drop-hint { font-size: 0.78rem; color: #9ca3af; margin-top: 4px; }
+
+    .status-bar {
+      margin-top: 20px;
+      min-height: 28px;
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status-bar.success { color: #059669; }
+    .status-bar.error   { color: #dc2626; }
+    .status-bar.info    { color: #6366f1; }
+
+    .error-list {
+      margin-top: 12px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: none;
+    }
+    .error-list.visible { display: block; }
+    .error-list h3 { font-size: 0.82rem; font-weight: 600; color: #dc2626; margin-bottom: 8px; }
+    .error-list ul { list-style: none; }
+    .error-list li {
+      font-size: 0.8rem;
+      color: #b91c1c;
+      padding: 2px 0;
+      border-bottom: 1px solid #fee2e2;
+    }
+    .error-list li:last-child { border-bottom: none; }
+
+    .preview-section { margin-top: 24px; display: none; }
+    .preview-section.visible { display: block; }
+
+    .preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .preview-header h2 { font-size: 0.95rem; font-weight: 600; color: #374151; }
+
+    .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .btn-download {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: none;
+      border-radius: 7px;
+      padding: 8px 16px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .btn-download.txt {
+      background: #6366f1;
+      color: #fff;
+    }
+    .btn-download.txt:hover { background: #4f46e5; }
+
+    .btn-download.csv {
+      background: #059669;
+      color: #fff;
+    }
+    .btn-download.csv:hover { background: #047857; }
+
+    textarea {
+      width: 100%;
+      height: 260px;
+      font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+      font-size: 0.78rem;
+      line-height: 1.6;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 12px 14px;
+      resize: vertical;
+      color: #111827;
+      background: #f9fafb;
+      white-space: pre;
+      overflow: auto;
+    }
+
+    .rules {
+      margin-top: 28px;
+      border-top: 1px solid #f3f4f6;
+      padding-top: 20px;
+    }
+    .rules h3 { font-size: 0.82rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+    .rule-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+      gap: 10px;
+    }
+    .rule-item {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    .rule-item .tag {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      background: #eef2ff;
+      color: #6366f1;
+      border-radius: 4px;
+      padding: 1px 7px;
+      margin-bottom: 5px;
+      font-family: monospace;
+    }
+    .rule-item .tag.multi  { background: #fdf4ff; color: #9333ea; }
+    .rule-item .tag.float  { background: #f0fdf4; color: #059669; }
+    .rule-item .tag.bool   { background: #fff7ed; color: #ea580c; }
+    .rule-item .tag.int    { background: #eff6ff; color: #2563eb; }
+    .rule-item .tag.entry  { background: #fefce8; color: #ca8a04; }
+    .rule-item p { font-size: 0.77rem; color: #6b7280; line-height: 1.4; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="card-header">
+    <div class="card-header-text">
+      <h1>Excel → Tab / CSV Converter</h1>
+      <p class="subtitle">Converts a PLM load template (.xlsx) in your browser. No data is uploaded anywhere.</p>
+    </div>
+    <button class="btn-reset" id="resetBtn" disabled>✕ Reset</button>
+  </div>
+
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".xlsx" />
+    <div class="drop-icon">📂</div>
+    <div class="drop-label"><span>Choose a .xlsx file</span> or drag and drop here</div>
+    <div class="drop-hint">Load-Template.xlsx · stays in this browser session</div>
+  </div>
+
+  <div class="status-bar" id="statusBar"></div>
+
+  <div class="error-list" id="errorList">
+    <h3>Validation errors</h3>
+    <ul id="errorItems"></ul>
+  </div>
+
+  <div class="preview-section" id="previewSection">
+    <div class="preview-header">
+      <h2>Output preview <span style="font-weight:400;color:#9ca3af;font-size:0.8rem">(tab-delimited)</span></h2>
+      <div class="btn-group">
+        <button class="btn-download txt" id="downloadTxt">⬇ datafile.txt</button>
+        <button class="btn-download csv" id="downloadCsv">⬇ datafile.csv</button>
+      </div>
+    </div>
+    <textarea id="outputArea" readonly spellcheck="false"></textarea>
+  </div>
+
+  <div class="rules">
+    <h3>Column suffix rules</h3>
+    <div class="rule-grid">
+      <div class="rule-item">
+        <span class="tag">-SingleList</span>
+        <span class="tag">-ColorChoice</span>
+        <p>Display name → internal name via References sheet. Error if not found.</p>
+      </div>
+      <div class="rule-item">
+        <span class="tag multi">-MultiList</span>
+        <span class="tag multi">-Composite</span>
+        <p>Comma-separated display names → internal names joined by <code>|~*~|</code>.</p>
+      </div>
+      <div class="rule-item">
+        <span class="tag float">-Float</span>
+        <p>Must be a valid decimal number. Error otherwise.</p>
+      </div>
+      <div class="rule-item">
+        <span class="tag bool">-Boolean</span>
+        <p><code>Yes</code> → <code>true</code>, <code>No</code> → <code>false</code>. Only these two values accepted.</p>
+      </div>
+      <div class="rule-item">
+        <span class="tag int">-Integer</span>
+        <p>Must be a whole number with no decimal point. Error otherwise.</p>
+      </div>
+      <div class="rule-item">
+        <span class="tag entry">-MultiEntry</span>
+        <p>Comma-separated plain text values joined by <code>|~*~|</code>. No reference lookup.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const MULTILIST_SEP = "|~*~|";
+
+  const SUFFIX_MAP = {
+    "SingleList":  "SingleList",
+    "ColorChoice": "SingleList",
+    "MultiList":   "MultiList",
+    "Composite":   "MultiList",
+    "Float":       "Float",
+    "Boolean":     "Boolean",
+    "Integer":     "Integer",
+    "MultiEntry":  "MultiEntry",
+  };
+
+  // ── Conversion logic ────────────────────────────────────────────────────────
+
+  function parseHeader(header) {
+    for (const [raw, canonical] of Object.entries(SUFFIX_MAP)) {
+      if (header.endsWith(`-${raw}`)) {
+        return { base: header.slice(0, -(raw.length + 1)), suffix: canonical };
+      }
+    }
+    return { base: header, suffix: null };
+  }
+
+  function buildLookup(ws) {
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+    if (rows.length === 0) return {};
+
+    const headers = rows[0].map(h => (h == null ? "" : String(h).trim()));
+    const categoryMap = {};
+    headers.forEach((h, i) => {
+      if (h.endsWith("-Internal Name")) {
+        const category = h.slice(0, -"-Internal Name".length);
+        const dispIdx = headers.indexOf(`${category}-Display Name`);
+        if (dispIdx !== -1) categoryMap[category] = { intIdx: i, dispIdx };
+      }
+    });
+
+    const lookup = {};
+    for (const [cat, { intIdx, dispIdx }] of Object.entries(categoryMap)) {
+      lookup[cat] = {};
+      for (let r = 1; r < rows.length; r++) {
+        const internal = rows[r][intIdx];
+        const display  = rows[r][dispIdx];
+        if (internal != null && display != null) {
+          lookup[cat][String(display).trim()] = String(internal).trim();
+        }
+      }
+    }
+    return lookup;
+  }
+
+  function resolveSingle(value, category, lookup, rowNum, colName) {
+    const catMap = lookup[category];
+    if (!catMap) throw new Error(`Row ${rowNum}, column "${colName}": no reference table for category "${category}"`);
+    const result = catMap[value];
+    if (result === undefined) {
+      const valid = Object.keys(catMap).sort().join(", ");
+      throw new Error(`Row ${rowNum}, column "${colName}": "${value}" not found in References for "${category}". Valid: ${valid}`);
+    }
+    return result;
+  }
+
+  function transformCell(raw, suffix, base, lookup, rowNum, colName) {
+    const value = raw == null ? "" : String(raw).trim();
+    if (!suffix) return value;
+
+    if (suffix === "SingleList") return resolveSingle(value, base, lookup, rowNum, colName);
+
+    if (suffix === "MultiList") {
+      const parts = value.split(",").map(p => p.trim()).filter(Boolean);
+      return parts.map(p => resolveSingle(p, base, lookup, rowNum, colName)).join(MULTILIST_SEP);
+    }
+
+    if (suffix === "Float") {
+      if (value === "" || isNaN(Number(value)))
+        throw new Error(`Row ${rowNum}, column "${colName}": "${value}" is not a valid floating-point number`);
+      return value;
+    }
+
+    if (suffix === "Boolean") {
+      if (value === "Yes") return "true";
+      if (value === "No")  return "false";
+      throw new Error(`Row ${rowNum}, column "${colName}": Boolean must be "Yes" or "No", got "${value}"`);
+    }
+
+    if (suffix === "Integer") {
+      if (value === "" || !/^[+-]?\d+$/.test(value))
+        throw new Error(`Row ${rowNum}, column "${colName}": "${value}" is not a valid whole number (no decimals allowed)`);
+      return value;
+    }
+
+    if (suffix === "MultiEntry") {
+      const parts = value.split(",").map(p => p.trim()).filter(Boolean);
+      return parts.join(MULTILIST_SEP);
+    }
+
+    return value;
+  }
+
+  function convert(workbook) {
+    const wsData = workbook.Sheets[workbook.SheetNames[0]];
+    const wsRef  = workbook.Sheets[workbook.SheetNames[1]];
+    const lookup = buildLookup(wsRef);
+    const rows   = XLSX.utils.sheet_to_json(wsData, { header: 1, defval: null });
+
+    if (rows.length === 0) throw new Error("Sheet1 is empty.");
+
+    const headers       = rows[0].map(h => (h == null ? "" : String(h)));
+    const parsedHeaders = headers.map(parseHeader);
+    const outputLines   = [];
+    const errors        = [];
+
+    for (let i = 1; i < rows.length; i++) {
+      const row       = rows[i];
+      const outCols   = [];
+      let rowHasError = false;
+
+      for (let c = 0; c < headers.length; c++) {
+        const { base, suffix } = parsedHeaders[c];
+        try {
+          outCols.push(transformCell(row[c], suffix, base, lookup, i, headers[c]));
+        } catch (e) {
+          errors.push(e.message);
+          rowHasError = true;
+        }
+      }
+
+      if (!rowHasError) outputLines.push(outCols.join("\t"));
+    }
+
+    return { outputLines, errors };
+  }
+
+  // ── CSV serialisation ───────────────────────────────────────────────────────
+
+  function csvField(value) {
+    // Wrap in quotes if field contains comma, double-quote, or newline
+    if (/[",\r\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+    return value;
+  }
+
+  function tabLinesToCsv(tabLines) {
+    return tabLines
+      .map(line => line.split("\t").map(csvField).join(","))
+      .join("\n");
+  }
+
+  // ── Download helper ─────────────────────────────────────────────────────────
+
+  function triggerDownload(content, filename, mimeType) {
+    const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement("a"), { href: url, download: filename });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── UI state ────────────────────────────────────────────────────────────────
+
+  let outputLines = [];   // transformed rows as tab-delimited strings
+
+  function setStatus(msg, type) {
+    const el = document.getElementById("statusBar");
+    el.textContent = msg;
+    el.className = `status-bar ${type}`;
+  }
+
+  function showErrors(errs) {
+    const box   = document.getElementById("errorList");
+    const items = document.getElementById("errorItems");
+    items.innerHTML = "";
+    errs.forEach(e => {
+      const li = document.createElement("li");
+      li.textContent = e;
+      items.appendChild(li);
+    });
+    box.classList.toggle("visible", errs.length > 0);
+  }
+
+  function reset() {
+    outputLines = [];
+    document.getElementById("fileInput").value = "";
+    document.getElementById("outputArea").value = "";
+    document.getElementById("statusBar").textContent = "";
+    document.getElementById("statusBar").className = "status-bar";
+    document.getElementById("previewSection").classList.remove("visible");
+    document.getElementById("errorList").classList.remove("visible");
+    document.getElementById("errorItems").innerHTML = "";
+    document.getElementById("resetBtn").disabled = true;
+    // Reset drop zone label
+    const label = document.querySelector(".drop-label");
+    label.innerHTML = '<span>Choose a .xlsx file</span> or drag and drop here';
+  }
+
+  function processFile(file) {
+    if (!file) return;
+    if (!file.name.endsWith(".xlsx")) {
+      setStatus("Please select a .xlsx file.", "error");
+      return;
+    }
+
+    setStatus(`Reading ${file.name}…`, "info");
+    document.getElementById("previewSection").classList.remove("visible");
+    document.getElementById("errorList").classList.remove("visible");
+    document.getElementById("resetBtn").disabled = false;
+    // Show filename in drop zone
+    document.querySelector(".drop-label").innerHTML =
+      `<span>${file.name}</span>`;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb     = XLSX.read(e.target.result, { type: "array" });
+        const result = convert(wb);
+        outputLines  = result.outputLines;
+
+        showErrors(result.errors);
+
+        if (outputLines.length > 0) {
+          document.getElementById("outputArea").value = outputLines.join("\n");
+          document.getElementById("previewSection").classList.add("visible");
+          const rowWord = outputLines.length === 1 ? "row" : "rows";
+          const errNote = result.errors.length ? ` (${result.errors.length} error(s) — see below)` : "";
+          setStatus(`✓ Converted ${outputLines.length} data ${rowWord}.${errNote}`,
+            result.errors.length ? "error" : "success");
+        } else if (result.errors.length === 0) {
+          setStatus("No data rows found in Sheet1.", "error");
+        } else {
+          setStatus(`${result.errors.length} error(s) — no output produced.`, "error");
+        }
+      } catch (err) {
+        setStatus(`Error: ${err.message}`, "error");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // ── Event wiring ────────────────────────────────────────────────────────────
+
+  document.getElementById("fileInput").addEventListener("change", (e) => {
+    processFile(e.target.files[0]);
+  });
+
+  const dropZone = document.getElementById("dropZone");
+  dropZone.addEventListener("dragover",  (e) => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+  dropZone.addEventListener("dragleave", ()  => dropZone.classList.remove("drag-over"));
+  dropZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("drag-over");
+    processFile(e.dataTransfer.files[0]);
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", reset);
+
+  document.getElementById("downloadTxt").addEventListener("click", () => {
+    if (outputLines.length === 0) return;
+    triggerDownload(outputLines.join("\n"), "datafile.txt", "text/plain");
+  });
+
+  document.getElementById("downloadCsv").addEventListener("click", () => {
+    if (outputLines.length === 0) return;
+    triggerDownload(tabLinesToCsv(outputLines), "datafile.csv", "text/csv");
+  });
+</script>
+</body>
+</html>
