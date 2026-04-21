@@ -1,4 +1,4 @@
-# PLM Data Loader — Excel to Tab / CSV Converter
+# PLM Load Converter — Excel to Tab / CSV Converter
 
 Converts a PLM load template (`.xlsx`) into a tab-delimited (`.txt`) or comma-separated (`.csv`) file.
 Two delivery options: a **browser app** (no install) and a **Python CLI**.
