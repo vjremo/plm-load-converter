@@ -129,11 +129,8 @@ def transform_cell(raw, suffix, category, lookup, row_num, col_name):
         )
 
     if suffix == "Integer":
-        try:
-            parsed = int(value)
-            if str(parsed) != value.lstrip("+-"):
-                raise ValueError()
-        except (ValueError, AttributeError):
+        import re
+        if not re.fullmatch(r"[+-]?\d+", value):
             raise ValueError(
                 f"Row {row_num}, column '{col_name}': "
                 f"'{value}' is not a valid whole number (no decimals allowed)"
