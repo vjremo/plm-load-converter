@@ -25,8 +25,8 @@ class TestParseHeader:
     def test_multi_list(self):
         assert parse_header("Age Range-MultiList") == ("Age Range", "MultiList")
 
-    def test_composite_maps_to_multi_list(self):
-        assert parse_header("Style-Composite") == ("Style", "MultiList")
+    def test_composite_maps_to_composite(self):
+        assert parse_header("Style-Composite") == ("Style", "Composite")
 
     def test_float(self):
         assert parse_header("Price-Float") == ("Price", "Float")
@@ -91,10 +91,41 @@ class TestMultiList:
         with pytest.raises(ValueError, match="not found in References"):
             transform_cell("6 plus,Unknown", "MultiList", "Age Range", LOOKUP, 1, "col")
 
-    def test_composite_suffix_resolves(self):
+    def test_composite_suffix_is_separate_type(self):
         _, suffix = parse_header("Age Range-Composite")
-        result = transform_cell("3 to 6 years,6 plus", suffix, "Age Range", LOOKUP, 1, "col")
-        assert result == "xyz4to6|~*~|xyz6plus"
+        assert suffix == "Composite"
+
+
+# ── Composite ────────────────────────────────────────────────────────────────
+
+class TestComposite:
+    def test_two_entries(self):
+        result = transform_cell("50% 0 to 3 years, 50% 6 plus", "Composite", "Age Range", LOOKUP, 1, "col")
+        assert result == "50.0% xyz0to3|~*~|50.0% xyz6plus"
+
+    def test_three_entries(self):
+        result = transform_cell("50% 0 to 3 years, 25% 3 to 6 years, 25% 6 plus", "Composite", "Age Range", LOOKUP, 1, "col")
+        assert result == "50.0% xyz0to3|~*~|25.0% xyz4to6|~*~|25.0% xyz6plus"
+
+    def test_single_entry_100_percent(self):
+        result = transform_cell("100% 6 plus", "Composite", "Age Range", LOOKUP, 1, "col")
+        assert result == "100.0% xyz6plus"
+
+    def test_decimal_percentages(self):
+        result = transform_cell("33.3% 0 to 3 years, 33.3% 3 to 6 years, 33.4% 6 plus", "Composite", "Age Range", LOOKUP, 1, "col")
+        assert result == "33.3% xyz0to3|~*~|33.3% xyz4to6|~*~|33.4% xyz6plus"
+
+    def test_percentages_not_100_raises(self):
+        with pytest.raises(ValueError, match="must sum to 100%"):
+            transform_cell("50% 0 to 3 years, 30% 6 plus", "Composite", "Age Range", LOOKUP, 1, "col")
+
+    def test_missing_percent_format_raises(self):
+        with pytest.raises(ValueError, match="must be in format"):
+            transform_cell("0 to 3 years, 6 plus", "Composite", "Age Range", LOOKUP, 1, "col")
+
+    def test_unknown_display_name_raises(self):
+        with pytest.raises(ValueError, match="not found in References"):
+            transform_cell("50% Unknown, 50% 6 plus", "Composite", "Age Range", LOOKUP, 1, "col")
 
 
 # ── Float ─────────────────────────────────────────────────────────────────────

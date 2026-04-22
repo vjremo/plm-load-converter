@@ -63,7 +63,7 @@ def parse_header(header: str):
         "SingleList": "SingleList",
         "ColorChoice": "SingleList",
         "MultiList": "MultiList",
-        "Composite": "MultiList",
+        "Composite": "Composite",
         "Float": "Float",
         "Boolean": "Boolean",
         "Integer": "Integer",
@@ -107,6 +107,29 @@ def transform_cell(raw, suffix, category, lookup, row_num, col_name):
         resolved = [
             resolve_single(p, category, lookup, row_num, col_name) for p in parts
         ]
+        return MULTILIST_SEP.join(resolved)
+
+    if suffix == "Composite":
+        parts = [p.strip() for p in value.split(",") if p.strip()]
+        resolved = []
+        total_pct = 0.0
+        for part in parts:
+            m = re.match(r'^(\d+(?:\.\d+)?)\s*%\s*(.+)$', part)
+            if not m:
+                raise ValueError(
+                    f"Row {row_num}, column '{col_name}': "
+                    f"Composite entry '{part}' must be in format 'X% display_name'"
+                )
+            pct = float(m.group(1))
+            display_name = m.group(2).strip()
+            total_pct += pct
+            internal = resolve_single(display_name, category, lookup, row_num, col_name)
+            resolved.append(f"{pct:.1f}% {internal}")
+        if abs(total_pct - 100.0) > 0.001:
+            raise ValueError(
+                f"Row {row_num}, column '{col_name}': "
+                f"Composite percentages must sum to 100%, got {total_pct:.1f}%"
+            )
         return MULTILIST_SEP.join(resolved)
 
     if suffix == "Float":

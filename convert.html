@@ -268,8 +268,11 @@
       </div>
       <div class="rule-item">
         <span class="tag multi">-MultiList</span>
-        <span class="tag multi">-Composite</span>
         <p>Comma-separated display names → internal names joined by <code>|~*~|</code>.</p>
+      </div>
+      <div class="rule-item">
+        <span class="tag multi">-Composite</span>
+        <p>Comma-separated <code>X% display_name</code> entries → <code>X.0% internal_name</code> joined by <code>|~*~|</code>. Percentages must sum to 100%.</p>
       </div>
       <div class="rule-item">
         <span class="tag float">-Float</span>
@@ -298,7 +301,7 @@
     "SingleList":  "SingleList",
     "ColorChoice": "SingleList",
     "MultiList":   "MultiList",
-    "Composite":   "MultiList",
+    "Composite":   "Composite",
     "Float":       "Float",
     "Boolean":     "Boolean",
     "Integer":     "Integer",
@@ -364,6 +367,23 @@
     if (suffix === "MultiList") {
       const parts = value.split(",").map(p => p.trim()).filter(Boolean);
       return parts.map(p => resolveSingle(p, base, lookup, rowNum, colName)).join(MULTILIST_SEP);
+    }
+
+    if (suffix === "Composite") {
+      const parts = value.split(",").map(p => p.trim()).filter(Boolean);
+      let totalPct = 0;
+      const resolved = parts.map(part => {
+        const m = part.match(/^(\d+(?:\.\d+)?)\s*%\s*(.+)$/);
+        if (!m) throw new Error(`Row ${rowNum}, column "${colName}": Composite entry "${part}" must be in format "X% display_name"`);
+        const pct = parseFloat(m[1]);
+        const displayName = m[2].trim();
+        totalPct += pct;
+        const internal = resolveSingle(displayName, base, lookup, rowNum, colName);
+        return `${pct.toFixed(1)}% ${internal}`;
+      });
+      if (Math.abs(totalPct - 100) > 0.001)
+        throw new Error(`Row ${rowNum}, column "${colName}": Composite percentages must sum to 100%, got ${totalPct.toFixed(1)}%`);
+      return resolved.join(MULTILIST_SEP);
     }
 
     if (suffix === "Float") {
