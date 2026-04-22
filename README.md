@@ -56,7 +56,7 @@ python convert.py path/to/input.xlsx path/to/output.txt
 | D | `Department-SingleList` | Single lookup |
 | E | `Class-ColorChoice` | Single lookup |
 | F | `Age Range-MultiList` | Multi lookup |
-| G | `Style-Composite` | Multi lookup |
+| G | `Material Content-Composite` | Percentage-weighted multi lookup |
 | H | `Short Description` | Plain string |
 | I | `Target Retail Price-Float` | Float validation |
 | J | `Certified-Boolean` | Boolean conversion |
@@ -88,7 +88,7 @@ The category must match the prefix before the suffix in Sheet 1 headers
 | `-SingleList` | SingleList | Looks up the display name in References → outputs internal name. Error if not found. |
 | `-ColorChoice` | SingleList | Same as SingleList. |
 | `-MultiList` | MultiList | Comma-separated display names → each looked up → joined with `\|~*~\|`. Error if any value not found. |
-| `-Composite` | MultiList | Same as MultiList. |
+| `-Composite` | Composite | Comma-separated `X% display_name` entries → each looked up → output as `X.0% internal_name` joined with `\|~*~\|`. Percentages must sum to exactly 100%. |
 | `-Float` | Float | Validates the value is a decimal number. Error if not. |
 | `-Boolean` | Boolean | `Yes` → `true`, `No` → `false`. Error on any other value. |
 | `-Integer` | Integer | Must be a whole number with no decimal point. Error otherwise. |
@@ -105,10 +105,16 @@ Tab-delimited, one line per data row, no header row, no row numbers.
 Product	Product\Type1	Test Product	xyzDept1	xyzClass1	xyz6plus	Test Descrition	3.05	true
 ```
 
-**MultiList / Composite example** — input cell `3 to 6 years,6 plus` becomes:
+**MultiList example** — input cell `3 to 6 years,6 plus` becomes:
 
 ```
 xyz4to6|~*~|xyz6plus
+```
+
+**Composite example** — input cell `50% Cotton, 50% Polyester` becomes:
+
+```
+50.0% xyzCotton|~*~|50.0% xyzPolyester
 ```
 
 **MultiEntry example** — input cell `Test1, Test2` becomes:
@@ -129,6 +135,8 @@ Errors include the row number and column name for easy location.
 | Invalid float | `Row 3, column "Target Retail Price-Float": "abc" is not a valid floating-point number` |
 | Invalid boolean | `Row 4, column "Certified-Boolean": Boolean must be "Yes" or "No", got "maybe"` |
 | Invalid integer | `Row 5, column "Sort Order-Integer": "3.5" is not a valid whole number (no decimals allowed)` |
+| Composite bad format | `Row 6, column "Material Content-Composite": Composite entry "Cotton" must be in format "X% display_name"` |
+| Composite percentages ≠ 100% | `Row 6, column "Material Content-Composite": Composite percentages must sum to 100%, got 80.0%` |
 
 In the browser app, all errors are shown in a red panel beneath the drop zone and rows with errors are skipped in the output. In the CLI, errors are raised and the process exits with a non-zero code.
 
